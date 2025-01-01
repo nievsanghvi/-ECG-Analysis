@@ -1,40 +1,52 @@
-### **Python Code (`ecg_analysis.py`)**
-
-```python
 import argparse
-import pandas as pd
-import numpy as np
-from scipy.signal import find_peaks
-import matplotlib.pyplot as plt
 
-def load_ecg_data(file_path):
-    """Load ECG data from a CSV file."""
-    try:
-        data = pd.read_csv(file_path)
-        if 'time' not in data.columns or 'voltage' not in data.columns:
-            raise ValueError("The input file must have 'time' and 'voltage' columns.")
-        return data
-    except Exception as e:
-        print(f"Error loading file: {e}")
+
+def load_ecg_data():
+    """Load ECG data by accepting input for time and voltage."""
+    print("Enter the ECG data as time-voltage pairs. Enter 'done' when finished:")
+    time = []
+    voltage = []
+
+    while True:
+        user_input = input("Enter time and voltage separated by a space (or 'done' to finish): ")
+        if user_input.lower() == 'done':
+            break
+        try:
+            t, v = user_input.split()
+            time.append(float(t))
+            voltage.append(float(v))
+        except ValueError:
+            print("Invalid input! Please enter two numbers separated by a space.")
+
+    if not time or not voltage:
+        print("No data provided. Exiting.")
         exit(1)
+    
+    return time, voltage
 
-def analyze_ecg(data):
+
+def find_peaks(voltage, height=0.5, min_distance=200):
+    """Basic peak detection algorithm."""
+    peaks = []
+
+    for i in range(1, len(voltage) - 1):
+        if voltage[i] >= height and voltage[i] > voltage[i - 1] and voltage[i] > voltage[i + 1]:
+            if not peaks or (i - peaks[-1]) >= min_distance:
+                peaks.append(i)
+
+    return peaks
+
+
+def analyze_ecg(time, voltage):
     """Perform detailed analysis on ECG data."""
-    time = data['time']
-    voltage = data['voltage']
-
     # Detect R-peaks
-    peaks, _ = find_peaks(voltage, height=0.5, distance=200)
+    peaks = find_peaks(voltage, height=0.5, min_distance=200)
 
-    # Calculate heart rate
-    rr_intervals = np.diff(time[peaks])  # Time difference between consecutive R-peaks
-    heart_rate = 60 / np.mean(rr_intervals)  # Convert to bpm
-
-    # Heart rate variability
-    hr_variability = np.std(rr_intervals)
-
-    # QRS duration (simplified for example purposes)
-    qrs_duration = (np.max(rr_intervals) - np.min(rr_intervals)) * 1000  # in milliseconds
+    # Calculate RR intervals
+    rr_intervals = [time[peaks[i+1]] - time[peaks[i]] for i in range(len(peaks) - 1)]
+    heart_rate = 60 / (sum(rr_intervals) / len(rr_intervals)) if rr_intervals else 0
+    hr_variability = (max(rr_intervals) - min(rr_intervals)) if rr_intervals else 0
+    qrs_duration = (max(rr_intervals) - min(rr_intervals)) * 1000 if rr_intervals else 0
 
     # Generate basic health insights
     consultation = "Normal ECG detected. Keep following a healthy lifestyle."
@@ -60,6 +72,7 @@ def analyze_ecg(data):
         "consultation": consultation
     }
 
+
 def generate_report(results, output_file="ecg_report.txt"):
     """Save the analysis results into a text report."""
     with open(output_file, "w") as f:
@@ -70,33 +83,29 @@ def generate_report(results, output_file="ecg_report.txt"):
         f.write(f"Consultation: {results['consultation']}\n")
     print(f"Report saved to {output_file}")
 
-def plot_ecg(data):
+
+def plot_ecg(time, voltage):
     """Plot the ECG data."""
-    plt.figure(figsize=(12, 6))
-    plt.plot(data['time'], data['voltage'], label="ECG Signal")
-    plt.title("ECG Signal")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Voltage (mV)")
-    plt.legend()
-    plt.grid()
-    plt.show()
+    print("\n=== ECG Signal Plot ===")
+    print(f"Time (s):   {' '.join(map(str, time))}")
+    print(f"Voltage (mV): {' '.join(map(str, voltage))}")
+    print("NOTE: To view a proper graph, you would need to use an external plotting tool like Excel.")
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Analyze Patient ECG Report")
-    parser.add_argument("--file", required=True, help="Path to the ECG CSV file")
-    args = parser.parse_args()
-
-    # Load the ECG data
-    data = load_ecg_data(args.file)
+    """Main function."""
+    print("ECG Analysis Program")
+    time, voltage = load_ecg_data()  # Load ECG data directly from user input
 
     # Analyze the ECG data
-    results = analyze_ecg(data)
+    results = analyze_ecg(time, voltage)
 
     # Generate a report
     generate_report(results)
 
-    # Plot the ECG signal
-    plot_ecg(data)
+    # Display the ECG data for manual plotting
+    plot_ecg(time, voltage)
+
 
 if __name__ == "__main__":
     main()
